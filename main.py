@@ -8,6 +8,7 @@ class AnnotationApp:
     def show_status_message(self, message):
         self.status_label.config(text=message)
         self.root.after(3000, lambda: self.status_label.config(text=""))
+    
     def __init__(self, root):
         self.root = root
         self.root.title("Annotation Modification App")
@@ -43,16 +44,15 @@ class AnnotationApp:
         self.class_name_menu = tk.OptionMenu(root, self.class_name_var, *self.class_name_options, command=self.update_class_name)
         self.class_name_menu.grid(row=2, column=0, padx=10, pady=5, sticky='w')
 
-        
-
         self.previous_image_button = tk.Button(root, text="Previous Image", command=self.previous_image)
         self.previous_image_button.grid(row=4, column=0, padx=10, pady=5, sticky='w')
 
         self.next_image_button = tk.Button(root, text="Next Image", command=self.next_image)
         self.next_image_button.grid(row=5, column=0, padx=10, pady=5, sticky='w')
+        root.grid_rowconfigure(5, weight=1)
 
         self.status_label = tk.Label(root, text="", fg="green")
-        self.status_label.grid(row=6, column=1, padx=10, pady=5, sticky='se')
+        self.status_label.grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky='se')
 
     def save_json(self):
         if self.json_data:
@@ -66,12 +66,17 @@ class AnnotationApp:
                 self.json_data = json.load(f)
             self.json_file_path = json_file_path
             messagebox.showinfo("Info", "JSON File Loaded Successfully")
-            self.load_image()
+            self.clear_selection()
+        self.load_image()
 
     def open_images_folder(self):
         self.images_folder = filedialog.askdirectory()
         if self.images_folder:
             messagebox.showinfo("Info", "Images Folder Loaded Successfully")
+
+    def clear_selection(self):
+        if hasattr(self, 'selected_annotation'):
+            del self.selected_annotation
 
     def load_image(self):
         self.zoom_scale = 1.0
@@ -95,14 +100,11 @@ class AnnotationApp:
             self.canvas.config(scrollregion=(0, 0, image.width, image.height))
             if hasattr(self, 'image_on_canvas'):
                 self.canvas.delete(self.image_on_canvas)
-                if hasattr(self, 'image_on_canvas'):
-                    self.canvas.delete(self.image_on_canvas)
-                self.image_on_canvas = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
+            self.image_on_canvas = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
             self.load_annotations(image_info["id"], image.width / image_info["width"], image.height / image_info["height"])
             self.canvas.bind("<Button-1>", self.on_annotation_click)
             self.canvas.bind("<MouseWheel>", self.zoom_image)
             self.canvas.tag_raise("annotation")
-            self.canvas.bind("<Button-1>", self.on_annotation_click)
         else:
             messagebox.showwarning("Warning", f"Image {image_info['file_name']} not found in folder.")
 
@@ -132,8 +134,6 @@ class AnnotationApp:
         self.selected_annotation["class_name"] = new_class_name
         self.save_json()
         self.show_status_message("Class name updated successfully.")
-
-        
 
     def on_annotation_click(self, event):
         # Reset all annotations to red before handling the click
@@ -165,17 +165,21 @@ class AnnotationApp:
                 image = image.resize(new_size, Image.LANCZOS)
                 self.photo = ImageTk.PhotoImage(image)
                 self.canvas.config(scrollregion=(0, 0, new_size[0], new_size[1]))
-                self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
+                if hasattr(self, 'image_on_canvas'):
+                    self.canvas.delete(self.image_on_canvas)
+                self.image_on_canvas = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
                 self.load_annotations(image_info["id"], new_size[0] / image_info["width"], new_size[1] / image_info["height"])
                 self.canvas.tag_raise("annotation")
 
     def previous_image(self):
         if self.current_image_index > 0:
             self.current_image_index -= 1
-            self.load_image()
+            self.clear_selection()
+        self.load_image()
 
     def next_image(self):
         self.current_image_index += 1
+        self.clear_selection()
         self.load_image()
 
 
